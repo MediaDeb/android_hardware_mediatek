@@ -9,8 +9,6 @@
 //For directory operation
 #include <dirent.h>
 
-#include <cutils/properties.h>
-#include <cutils/misc.h>
 #include <sys/ioctl.h>
-
+#include <portability.h>
 #endif

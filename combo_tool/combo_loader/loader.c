@@ -1,9 +1,7 @@
-
 #include "loader.h"
 #include "loader_pwr.h"
 //#include <syslog.h>
-#include <private/android_filesystem_config.h>
-#include <utils/Log.h>
+
 
 #ifdef LOG_TAG
 #undef LOG_TAG
@@ -69,8 +67,11 @@ extern int load_fm_module(int chip_id);
 extern int load_wifi_module(int chip_id);
 extern int load_ant_module(int chip_id);
 //insmod
+
 static int insmod(const char *filename, const char *args)
 {
+    return 0;
+    #if 0
     void *module;
     unsigned int size;
     int ret = -1;
@@ -99,15 +100,15 @@ static int insmod(const char *filename, const char *args)
 	}
 
     free(module);
-
     return ret;
+    #endif
 }
 static int is_chipId_vaild(int chipid)
 {
 	int iret;
 	unsigned char i;
 	iret = -1;
-	
+
 	for(i = 0;i < sizeof(chipid_array)/sizeof(0x6630); i++){
 		if(chipid == chipid_array[i]){
 			ALOGI("is_chipId_vaild: %d :0x%x!\n",i,chipid);
@@ -631,6 +632,7 @@ int main(int argc, char *argv[])
 		}
 
 
+#if 0
 		loadFmResult = load_fm_module(chipId);
 		if(loadFmResult)
 		{
@@ -654,10 +656,12 @@ int main(int argc, char *argv[])
 			/*continue, we cannot let this process interrupted by subsystem module load fail*/
 			/*goto done;*/
 		}
+#endif
 	}
 
 
 
+/*
 	if((chown("/proc/driver/wmt_dbg",AID_SHELL,AID_SYSTEM) == -1) || (chown("/proc/driver/wmt_aee",AID_SHELL,AID_SYSTEM) == -1))
 	{
 		ALOGI("chown wmt_dbg or wmt_aee fail:%s\n",strerror(errno));
@@ -667,6 +671,8 @@ int main(int argc, char *argv[])
 	{
 		ALOGI("chown wmt_tm fail:%s\n",strerror(errno));
 	}
+*/
+
 	if (0/*0x6630 == chipId*/)
 	{
 		retryCounter = 0;
@@ -708,6 +714,3 @@ int main(int argc, char *argv[])
 
 	return iRet;
 }
-
-
-

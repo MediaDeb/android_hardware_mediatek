@@ -25,15 +25,17 @@
 #include <sys/poll.h>
 #include <sys/param.h>
 #include <sys/socket.h>
-#include <sys/endian.h>
+#include <pthread.h>
+//#include <sys/endian.h>
 #include <sys/uio.h>
 #include <linux/serial.h> /* struct serial_struct  */
-#include <utils/Log.h>
+//#include <utils/Log.h>
 
 //For directory operation
 #include <dirent.h>
-#include <cutils/properties.h>
+//#include <cutils/properties.h>
 
+#include <portability.h>
 
 /******************************************************************************
 *                              C O N S T A N T S
@@ -83,12 +85,12 @@ typedef enum {
     UART_HW_FC = 3,      /*HW Flow Control*/
 } STP_UART_FC;
 
-typedef struct 
+typedef struct
 {
     const char *key;
     const char *defValue;
     char value[PROPERTY_VALUE_MAX];
-    
+
 }SYS_PROPERTY;
 
 
@@ -123,7 +125,7 @@ typedef struct {
 
 
 typedef struct {
-    int chipId; 
+    int chipId;
     STP_MODE stpMode;
     CHIP_ANT_MODE_INFO antMode;
 }CHIP_MODE_INFO, *P_CHIP_MODE_INFO;
@@ -212,12 +214,12 @@ static STP_UART_CONFIG g_stp_uart_config;
 
 struct cmd_hdr cmd_hdr_table[] = {
     { "baud_115200_0", cmd_hdr_baud_115k},
-    { "baud_921600_0", cmd_hdr_baud_921k},    
+    { "baud_921600_0", cmd_hdr_baud_921k},
     { "baud_2000000_0", cmd_hdr_baud_2kk},
-    { "baud_2500000_0", cmd_hdr_baud_2_5kk},    
+    { "baud_2500000_0", cmd_hdr_baud_2_5kk},
     { "baud_3000000_0", cmd_hdr_baud_3kk},
     //{ "baud_3200000_0", cmd_hdr_baud_3_2kk},
-    //{ "baud_3250000_0", cmd_hdr_baud_3_25kk},   
+    //{ "baud_3250000_0", cmd_hdr_baud_3_25kk},
     { "baud_3500000_0", cmd_hdr_baud_3_5kk},
     { "baud_4000000_0", cmd_hdr_baud_4kk},
     { "open_stp", cmd_hdr_stp_open},
@@ -241,7 +243,7 @@ static const char *gUartName = NULL;
 
 #if CUST_MULTI_PATCH
 static unsigned int gPatchNum = 0;
-static unsigned int gDwonSeq = 0; 
+static unsigned int gDwonSeq = 0;
 static P_STP_PATCH_INFO pStpPatchInfo = NULL;
 static STP_PATCH_INFO gStpPatchInfo;
 #endif
@@ -265,7 +267,7 @@ int setup_uart_param (
         ALOGE("Invalid stpUartConfig");
         return -2;
     }
-    
+
     ALOGI("setup_uart_param %d %d\n", iBaudrate, stpUartConfig->fc);
 
     fd = hComPort;
@@ -289,14 +291,14 @@ int setup_uart_param (
     ALOGI("(ori)ti.c_iflag = 0x%08x\n", ti.c_iflag);
     ALOGI("(ori)ti.c_cflag = 0x%08x\n", ti.c_cflag);
     ALOGI("stpUartConfig->fc= %d (0:none,sw,hw,linux)\n", stpUartConfig->fc);
-     
+
     if(stpUartConfig->fc == UART_DISABLE_FC){
         ti.c_cflag &= ~CRTSCTS;
         ti.c_iflag &= ~(0x80000000);
     } else if(stpUartConfig->fc == UART_MTK_SW_FC){
         ti.c_cflag &= ~CRTSCTS;
         ti.c_iflag |= 0x80000000; /*MTK Software FC*/
-    } else if(stpUartConfig->fc == UART_HW_FC){ 
+    } else if(stpUartConfig->fc == UART_HW_FC){
         ti.c_cflag |= CRTSCTS;      /*RTS, CTS Enable*/
         ti.c_iflag &= ~(0x80000000);
     } else if(stpUartConfig->fc == UART_LINUX_FC){
@@ -307,7 +309,7 @@ int setup_uart_param (
         ti.c_cflag &= ~CRTSCTS;
         ti.c_iflag &= ~(0x80000000);
     }
-    
+
     ALOGI("c_c CRTSCTS = 0x%16x\n", CRTSCTS);
     ALOGI("c_i IXON = 0x%08x\n", IXON);
     ALOGI("c_i IXOFF = 0x%08x\n", IXOFF);
@@ -388,7 +390,7 @@ int set_speed(int fd, struct termios *ti, int speed)
 
 
 int cmd_hdr_baud_115k (P_STP_PARAMS_CONFIG pStpParamsConfig) {
-    
+
     STP_UART_CONFIG *gStpUartConfig = &pStpParamsConfig->sUartConfig;
     return (gTtyFd != -1) ? setup_uart_param(gTtyFd, 115200, gStpUartConfig) : -1;
 }
@@ -512,7 +514,7 @@ int cmd_hdr_sch_patch (P_STP_PARAMS_CONFIG pStpParamsConfig)
     unsigned int isFirst = 1;
     P_STP_PATCH_INFO pstPaInfo = NULL;
     struct dirent* pDirent = NULL;
-    
+
     if (gWmtFd > 0)
     {
         /*1. ioctl to get CHIP ID*/
@@ -551,13 +553,13 @@ int cmd_hdr_sch_patch (P_STP_PARAMS_CONFIG pStpParamsConfig)
 			while (NULL != (pDirent = readdir(pDir)))
 			{
 				patchVer = 0;
-				
+
 				if (0 == (strncmp(pDirent->d_name, chipName, strlen(chipName))))
 				{    /*4.1. search patch name begined with chipName*/
 					strcpy (patchFullName, pStpParamsConfig->pPatchPath);
 					strcat (patchFullName, "/"); // robust, if input patch is /etc/firmwre/ no issue should be happened.
 					strcat (patchFullName, pDirent->d_name);
-					
+
 					ALOGI ("%s\n", patchFullName);
 					/*4.1. search patch name mt[CHIP ID]xxx.bin*/
 					if (0 < (patchFd = (open(patchFullName, O_RDONLY ))))
@@ -598,8 +600,8 @@ int cmd_hdr_sch_patch (P_STP_PARAMS_CONFIG pStpParamsConfig)
 #endif
 
         if((!strcmp(chipName,"mt6620")) || (!strcmp(chipName,"mt6628")) || (!strcmp(chipName,"mt6630")) ||
-			(!strcmp(chipName,"mt6572")) || (!strcmp(chipName,"mt6582")) || (!strcmp(chipName,"mt6592")) || 
-			(!strcmp(chipName,"mt8127"))  || (!strcmp(chipName,"mt6571")) || (!strcmp(chipName,"mt6752")) || 
+			(!strcmp(chipName,"mt6572")) || (!strcmp(chipName,"mt6582")) || (!strcmp(chipName,"mt6592")) ||
+			(!strcmp(chipName,"mt8127"))  || (!strcmp(chipName,"mt6571")) || (!strcmp(chipName,"mt6752")) ||
 			(!strcmp(chipName,"mt8163")) || (!strcmp(chipName,"mt6580"))|| (!strcmp(chipName,"mt6735")))
         {
         	if((!strcmp(chipName,"mt6572")) || (!strcmp(chipName,"mt6582")) || (!strcmp(chipName,"mt6592")))
@@ -612,7 +614,7 @@ int cmd_hdr_sch_patch (P_STP_PARAMS_CONFIG pStpParamsConfig)
 		}else if(!strcmp(chipName,"mt6752") || !strcmp(chipName,"mt6735") || !strcmp(chipName,"mt8163") || !strcmp(chipName,"mt6580")){
 			strncpy(chipName,"ROMv2_lm",strlen("ROMv2_lm"));
 		}
-			
+
         	strcat (chipName, "_patch");
             ALOGI ("patch name pre-fix:%s\n", chipName);
             /*2. ioctl to get FIRMWARE VERSION*/
@@ -635,13 +637,13 @@ int cmd_hdr_sch_patch (P_STP_PARAMS_CONFIG pStpParamsConfig)
                 while (NULL != (pDirent = readdir(pDir)))
                 {
                     patchVer = 0;
-                    
+
                     if (0 == (strncmp(pDirent->d_name, chipName, strlen(chipName))))
                     {    /*4.1. search patch name begined with chipName*/
                         strcpy (patchFullName, pStpParamsConfig->pPatchPath);
                         strcat (patchFullName, "/"); // robust, if input patch is /etc/firmwre/ no issue should be happened.
                         strcat (patchFullName, pDirent->d_name);
-                        
+
                         ALOGI ("%s\n", patchFullName);
                         /*4.1. search patch name mt[CHIP ID]xxx.bin*/
                         if (0 < (patchFd = (open(patchFullName, O_RDONLY ))))
@@ -651,12 +653,12 @@ int cmd_hdr_sch_patch (P_STP_PARAMS_CONFIG pStpParamsConfig)
                             {
                                 memset(&gStpPatchInfo,0,sizeof(gStpPatchInfo));
                                 memset(patchInfo,0,sizeof(patchInfo));
-                                
+
                                 read(patchFd, ((char *)&patchVer) + 1, 1);
                                 read(patchFd, ((char *)&patchVer), 1);
                                   /*print hardware version information in patch*/
                                 ALOGI ("fw Ver in patch: 0x%04x\n", patchVer);
-                                if (0 == ((patchVer ^ fwVersion) & 0x00ff)) 
+                                if (0 == ((patchVer ^ fwVersion) & 0x00ff))
                                 {
                                     read(patchFd,patchInfo,4);
                                     patchInfo[4] = '\0';
@@ -732,7 +734,7 @@ int cmd_hdr_sch_patch (P_STP_PARAMS_CONFIG pStpParamsConfig)
     int patchFd = -1;
     struct dirent* pDirent = NULL;
     int iRet = -1;
-	
+
     if (gWmtFd > 0)
     {
     /*1. ioctl to get CHIP ID*/
@@ -741,7 +743,7 @@ int cmd_hdr_sch_patch (P_STP_PARAMS_CONFIG pStpParamsConfig)
         sprintf (chipName + strlen(chipName), "%04x", chipId);
         strcat (chipName, "_patch");
         ALOGI ("patch name pre-fix:%s\n", chipName);
-#if 0        
+#if 0
     /*2. ioctl to get HARDWARE VERSION*/
         hwVersion = ioctl(gWmtFd, 12, 1);
         ALOGI ("hwVersion:0x%04x\n", hwVersion);
@@ -765,13 +767,13 @@ int cmd_hdr_sch_patch (P_STP_PARAMS_CONFIG pStpParamsConfig)
         while (NULL != (pDirent = readdir(pDir)))
         {
             patchVer = 0;
-            
+
             if (0 == (strncmp(pDirent->d_name, chipName, strlen(chipName))))
             {    /*4.1. search patch name begined with chipName*/
                 strcpy (patchFullName, pStpParamsConfig->pPatchPath);
                 strcat (patchFullName, "/"); // robust, if input patch is /etc/firmwre/ no issue should be happened.
                 strcat (patchFullName, pDirent->d_name);
-                
+
                 ALOGI ("%s\n", patchFullName);
                 /*4.1. search patch name mt[CHIP ID]xxx.bin*/
                 if (0 < (patchFd = (open(patchFullName, O_RDONLY ))))
@@ -780,12 +782,12 @@ int cmd_hdr_sch_patch (P_STP_PARAMS_CONFIG pStpParamsConfig)
                   /*4.2. read patch header and check if metch with MAJOR+MINOR number in fw version */
                     if (-1 != lseek (patchFd, 22, SEEK_SET))
                     {
-                        
+
                         read(patchFd, ((char *)&patchVer) + 1, 1);
                         read(patchFd, ((char *)&patchVer), 1);
                         /*print firmware version information in patch*/
                           ALOGI ("fw Ver in patch: 0x%04x\n", patchVer);
-                          if (0 == ((patchVer ^ fwVersion) & 0x00ff)) 
+                          if (0 == ((patchVer ^ fwVersion) & 0x00ff))
                             {
                                 ioctl(gWmtFd, WMT_IOCTL_SET_PATCH_NAME, patchFullName);
                                 ALOGI ("fw Ver in patch matches with firmware version\n");
@@ -807,9 +809,9 @@ int cmd_hdr_sch_patch (P_STP_PARAMS_CONFIG pStpParamsConfig)
                     ALOGE(patchFullName);
                 }
           }
-            
+
         }
-        
+
         /*5. return value*/
         closedir(pDir);
         pDir = NULL;
@@ -831,7 +833,7 @@ int handle_cmd (P_STP_PARAMS_CONFIG pStpParamsConfig, char *cmd, int len) {
     int ret = 1;
     int i;
     int cmd_len;
-    
+
     for (i = 0; i < (int)(sizeof(cmd_hdr_table)/sizeof(cmd_hdr_table[0])); ++i) {
         cmd_len = (int)strlen(cmd_hdr_table[i].pCmd);
         if (!strncmp(cmd_hdr_table[i].pCmd, cmd, (len < cmd_len) ? len : cmd_len)) {
@@ -881,13 +883,13 @@ void display_usage(int chipid)
 	{
 	    for (index = 0; index < sizeof (usage1)/sizeof (usage1[0]); index++ )
 	    {
-	       ALOGI("%s\n", usage1[index]); 
+	       ALOGI("%s\n", usage1[index]);
 	    }
     }else
 	{
 		for (index = 0; index < sizeof (usage2)/sizeof (usage2[0]); index++ )
 	    {
-	       ALOGI("%s\n", usage2[index]); 
+	       ALOGI("%s\n", usage2[index]);
 	    }
 	}
     exit(EXIT_FAILURE);
@@ -923,21 +925,21 @@ int para_valid_check (P_STP_PARAMS_CONFIG pStpParamConfig)
     }
     else if (pStpParamConfig->eStpMode == STP_UART_MAND || pStpParamConfig->eStpMode == STP_UART_FULL)
     {
-        //UART mode: (eStpMode = STP_MAND_MODE || STP_FULL_MODE) && (pPachName != NULL || pPatchPath != NULL) && (iBaudrate > 0) 
+        //UART mode: (eStpMode = STP_MAND_MODE || STP_FULL_MODE) && (pPachName != NULL || pPatchPath != NULL) && (iBaudrate > 0)
         ALOGI ("Common Interface: UART mode\n");
         if (NULL == pStpParamConfig->gStpDev){
             pStpParamConfig->gStpDev = CUST_COMBO_STP_DEV;
-            ALOGI ("no uart device input, use default: %s\n", pStpParamConfig->gStpDev);    
+            ALOGI ("no uart device input, use default: %s\n", pStpParamConfig->gStpDev);
         }
         if (pStpParamConfig->iBaudrate < 0)
         {
             //FixMe:Chaozhong, add baudrate validation check
             pStpParamConfig->iBaudrate = 4000000;
-            ALOGI ("no baudrate input, use default: %d\n", pStpParamConfig->iBaudrate);  
+            ALOGI ("no baudrate input, use default: %d\n", pStpParamConfig->iBaudrate);
         }
-        
-    }  
-    return 0; 
+
+    }
+    return 0;
 }
 
 static int wmt_cfg_item_parser(char *pItem)
@@ -959,11 +961,11 @@ static int wmt_cfg_item_parser(char *pItem)
         ALOGI("Warning:no string start with 'm' found in %s\n", pItem);
         return -2;
     }
-        
+
     for (index = 0; index < maxIndex; index++)
     {
         keyStr = (char*)gChipModeInfo[index].antMode.pCfgItem;
-        
+
         if (0 == strncasecmp(str, keyStr, strlen (keyStr)))
         {
             str = strstr(str, "=");
@@ -978,8 +980,8 @@ static int wmt_cfg_item_parser(char *pItem)
                 ALOGI("Warning:no 'm' found in %s\n", str);
                 return -4;
             }
-            
-            
+
+
             while (((*str)==' ') || ((*str)=='\t') || ((*str)=='\n'))
             {
                 if (str >= pItem + strlen(pItem))
@@ -989,7 +991,7 @@ static int wmt_cfg_item_parser(char *pItem)
                 str++;
             }
             valueStr = str;
-            
+
             while (((*str)!=' ') && ((*str)!='\t') && ((*str)!='\0') && ((*str)!='\n') && ((*str)!='\r'))
             {
                 if (str >= pItem + strlen(pItem))
@@ -998,7 +1000,7 @@ static int wmt_cfg_item_parser(char *pItem)
                     break;
                 }
                 str++;
-                
+
             }
             *str = '\0';
             strcpy(gChipModeInfo[index].antMode.cfgItemValue, valueStr);
@@ -1006,7 +1008,7 @@ static int wmt_cfg_item_parser(char *pItem)
             break;
         }
     }
-    
+
     return 0;
 }
 
@@ -1060,7 +1062,7 @@ static void set_coredump_flag(void)
 	{
 	    /*enable coredump by default*/
 	    ioctl(gWmtFd, WMT_IOCTL_WMT_COREDUMP_CTRL, 1);
-		
+
 	}
 	else
 	{
@@ -1068,7 +1070,7 @@ static void set_coredump_flag(void)
 		ioctl(gWmtFd, WMT_IOCTL_WMT_COREDUMP_CTRL, 0);
 	}
 	return;
-	
+
 }
 
 
@@ -1081,7 +1083,7 @@ static int get_wmt_cfg (int chipId)
     int iRet = -1;
     char *pStr = NULL;
     char line[MAXLINELEN];
-    
+
     file = fopen(WMTCFGFILEPATH, OPENMODE);
     if (NULL == file)
     {
@@ -1098,14 +1100,14 @@ static int get_wmt_cfg (int chipId)
         }
 
         wmt_cfg_item_parser(line);
-        
+
         memset(line, 0, MAXLINELEN);
-        
+
     }while (pStr != NULL);
 
     if (NULL != file)
     {
-        
+
         if (0 == fclose(file))
         {
             ALOGI("close %s succeed\n", WMTCFGFILEPATH);
@@ -1121,19 +1123,19 @@ static int get_wmt_cfg (int chipId)
 
 static int get_chip_info_index (int chipId)
 {
-    
+
     int i = 0;
     int index = -1;
-    
+
     int left = 0;
     int middle = 0;
     int right = sizeof (gChipModeInfo) / sizeof (gChipModeInfo[0]) - 1;
-    
+
     if ((chipId < gChipModeInfo[left].chipId) || (chipId > gChipModeInfo[right].chipId))
         return index;
-    
+
     middle = (left + right) / 2;
-    
+
     while (left <= right)
     {
         if (chipId > gChipModeInfo[middle].chipId)
@@ -1151,7 +1153,7 @@ static int get_chip_info_index (int chipId)
         }
         middle = (left + right) / 2;
     }
-    
+
     if (0 > index)
         ALOGI("no supported chipid found\n");
     else
@@ -1202,7 +1204,7 @@ static int query_chip_id(void)
 	        {
 	            ALOGI("set property(%s) to %s succeed.\n", chipIdProp.key, chipIdProp.value);
 	        }
-	        
+
 	        // read again
 	        if (0 != property_get(chipIdProp.key, chipIdProp.value, chipIdProp.defValue))
 	        {
@@ -1232,7 +1234,7 @@ static int check_chip_id(void)
     chipIdProp.key = WCN_COMBO_CHIP_ID_PROP;
     chipIdProp.defValue = NULL;
     int fdHifsdio = -1;
-    
+
 #if 1
     //read from system property
     if (0 != property_get(chipIdProp.key, chipIdProp.value, chipIdProp.defValue))
@@ -1247,7 +1249,7 @@ static int check_chip_id(void)
     }
 #else
     /*read from config file*/
-    
+
 #endif
     //open HIF-SDIO
     fdHifsdio = open("/dev/hifsdiod", O_RDWR | O_NOCTTY);
@@ -1285,7 +1287,7 @@ static int check_chip_id(void)
         ioctl(fdHifsdio, COMBO_IOCTL_SET_CHIP_ID, chipId);
         ALOGI("set chipId(0x%x) to HIF-SDIO module\n", chipId);
     }
-    
+
     //close HIF-SDIO
     close (fdHifsdio);
     fdHifsdio = -1;
@@ -1300,7 +1302,7 @@ static int setHifInfo(int chipId, char *cfgFilePath)
     if ((gStpMode <= STP_MIN) || (STP_SDIO < gStpMode))
     {
         ALOGI ("STP Mode is not set, fetching default mode...\n");
-        
+
         if (0 <= index)
         {
             gStpMode = gChipModeInfo[index].stpMode;
@@ -1310,7 +1312,7 @@ static int setHifInfo(int chipId, char *cfgFilePath)
             //gStpMode = STP_UART_FULL;
             gStpMode = -1;
         }
-        
+
     }
 
     if ((0 <= index) && (NULL != cfgFilePath))
@@ -1319,7 +1321,7 @@ static int setHifInfo(int chipId, char *cfgFilePath)
         strcpy (gWmtCfgName, cfgFilePath);
         strcat (gWmtCfgName, "/");
         strcat (gWmtCfgName, gChipModeInfo[index].antMode.cfgItemValue);
-        gWmtCfgName[strlen(cfgFilePath) + strlen("/") + strlen(gChipModeInfo[index].antMode.cfgItemValue)] = '\0'; 
+        gWmtCfgName[strlen(cfgFilePath) + strlen("/") + strlen(gChipModeInfo[index].antMode.cfgItemValue)] = '\0';
 		#if 0
         ALOGI ("strlen(cfgFilePath):%d, strlen('/'):%d, strlen(gChipModeInfo[index].antMode.cfgItemValue):%d\n", strlen(cfgFilePath),\
             strlen("/"), \
@@ -1331,7 +1333,7 @@ static int setHifInfo(int chipId, char *cfgFilePath)
     {
         memset(gWmtCfgName, 0, sizeof(gWmtCfgName));
     }
-    ALOGI ("chipId(0x%04x), default Mode(%d), strlen(gWmtCfgName)(%d), wmtCfgFile(%s)\n", chipId, gStpMode, strlen(gWmtCfgName), gWmtCfgName);    
+    ALOGI ("chipId(0x%04x), default Mode(%d), strlen(gWmtCfgName)(%d), wmtCfgFile(%s)\n", chipId, gStpMode, strlen(gWmtCfgName), gWmtCfgName);
     return gStpMode;
 }
 
@@ -1384,7 +1386,7 @@ static void* launcher_pwr_on_chip(void * arg)
  * -b: baudrate
  * -c: enable SW FC or not
  * -p: patch folder path
- * -n: patch file name (fullpath) 
+ * -n: patch file name (fullpath)
  *
  */
 int main(int argc, char *argv[])
@@ -1414,11 +1416,11 @@ int main(int argc, char *argv[])
     ALOGE("open device node succeed.(Node:%s, fd:%d) \n", CUST_COMBO_WMT_DEV, gWmtFd);
 
 	do{
-		chipId = query_chip_id(); 
+		chipId = query_chip_id();
 		if(0 > chipId)
 		{
 			usleep(300000);
-			chipId = ioctl(gWmtFd,WMT_IOCTL_WMT_QUERY_CHIPID,NULL);	
+			chipId = ioctl(gWmtFd,WMT_IOCTL_WMT_QUERY_CHIPID,NULL);
 			ALOGI("chiId from kernel by ioctl:0x%04x\n", chipId);
 			if(-1 != chipId)
 				break;
@@ -1477,7 +1479,7 @@ int main(int argc, char *argv[])
 	    sStpParaConfig.sUartConfig.fc = UART_DISABLE_FC;
 	    sStpParaConfig.sUartConfig.parity = 0;
 	    sStpParaConfig.sUartConfig.stop_bit = 0;
-	    
+
 	    /*Default parameters starts*/
 	    baud = 4000000;
 	    gStpMode = -1;
@@ -1486,7 +1488,7 @@ int main(int argc, char *argv[])
 	    memset(gPatchFolder, 0, sizeof(gPatchFolder));
 	    memset(gPatchName, 0, sizeof(gPatchName));
 	    /*Default parameters ends*/
-	    
+
 	    opt = getopt(argc, argv, opString);
 	    while (opt != -1)
 	    {
@@ -1507,7 +1509,7 @@ int main(int argc, char *argv[])
 	            case 'c':
 	                uartFcCtrl = atoi(optarg);
 	                sStpParaConfig.sUartConfig.fc = uartFcCtrl;
-	                ALOGI("c found\n");    
+	                ALOGI("c found\n");
 	                break;
 	            case 'p':
 	                //gPatchFolder = optarg;
@@ -1532,12 +1534,12 @@ int main(int argc, char *argv[])
 	        int i = 0;
 	        for (i = 0; i < argc; i++)
 	        {
-	            ALOGI("arg[%d] = %s\n", i, argv[i]);    
+	            ALOGI("arg[%d] = %s\n", i, argv[i]);
 	        }
 	    }
 #endif
 
-	     
+
 	    if (0 > get_chip_info_index(chipId))
 	    {
 	          ALOGI("invalid chip, check again\n");
@@ -1549,12 +1551,12 @@ int main(int argc, char *argv[])
     	ALOGI("set chipId(0x%x) to HIF-SDIO module\n", chipId);
 
 		get_wmt_cfg(chipId);
-		
+
 	    sStpParaConfig.eStpMode = setHifInfo(chipId, sStpParaConfig.pPatchPath);
 	    ALOGI("HifConfig:0x%04x, wmtCfgFile:%s\n", sStpParaConfig.eStpMode, gWmtCfgName);
 #ifndef WMT_PLAT_APEX
 	    set_coredump_flag();
-#endif		
+#endif
 	    if (0 != para_valid_check(&sStpParaConfig))
 	    {
 	        //Try to use custom method to check parameters
@@ -1577,13 +1579,13 @@ int main(int argc, char *argv[])
 	                gStpMode = STP_SDIO;
 	            }
 	            sStpParaConfig.eStpMode  = gStpMode;
-	            
+
 	            //Firmare patch analysis
-	            optind++;    
+	            optind++;
 	            memset(gPatchName, 0, sizeof(gPatchName));
 	            if (argc > optind)
 	            {
-	               strncat(gPatchName, argv[optind], sizeof(gPatchName)-1); 
+	               strncat(gPatchName, argv[optind], sizeof(gPatchName)-1);
 	               sStpParaConfig.pPatchName = gPatchName;
 	               ALOGI("PatchFile:%s\n", sStpParaConfig.pPatchName);
 	            }
@@ -1598,20 +1600,20 @@ int main(int argc, char *argv[])
 	            {
 	                uartFcCtrl = atoi(argv[optind]);
 	                sStpParaConfig.sUartConfig.fc = uartFcCtrl;
-	                ALOGI("flowcontrol flag: %d\n", sStpParaConfig.sUartConfig.fc);    
+	                ALOGI("flowcontrol flag: %d\n", sStpParaConfig.sUartConfig.fc);
 	            }
 	            else
 	            {
-	                ALOGI("no flow control flat set\n");    
+	                ALOGI("no flow control flat set\n");
 	            }
-	                
+
 	        }
 	    }
 	    if (0 != para_valid_check(&sStpParaConfig))
 	    {
 	        display_usage(chipId);
 	    }
-		
+
 		/* send default patch file name path to driver */
     	ioctl(gWmtFd, WMT_IOCTL_SET_PATCH_NAME, gPatchName);
 		    /* send uart name to driver*/
@@ -1623,17 +1625,17 @@ int main(int argc, char *argv[])
             	ALOGI("uart name %s\n", gUartName);
         	}
     	}
-    
+
     	if (!gUartName) {
         	gUartName = "ttyMT2";
         	ALOGI("use default uart %s\n", gUartName);
     	}
-    
+
     	ioctl(gWmtFd, WMT_IOCTL_PORT_NAME, gUartName);
-    
+
     	/* send hardware interface configuration to driver */
     	ioctl(gWmtFd, WMT_IOCTL_SET_STP_MODE, ((baud & 0xFFFFFF) << 8) | ((gFmMode & 0x0F) << 4)  |(gStpMode & 0x0F));
-    
+
     	/* send WMT config name configuration to driver */
     	ioctl(gWmtFd, WMT_IOCTL_WMT_CFG_NAME, gWmtCfgName);
 	}
@@ -1644,7 +1646,7 @@ int main(int argc, char *argv[])
 		ALOGE("create pwr on thread fail\n");
 	}else{
 		ALOGI("create pwr on thread ok\n");
-	}	
+	}
 
     /*set signal handler*/
     memset(&sa, 0, sizeof(sa));
@@ -1659,27 +1661,27 @@ int main(int argc, char *argv[])
 
     sa.sa_handler = sig_hup;
     sigaction(SIGHUP, &sa, NULL);
-    
+
 
     fds[0].fd = gWmtFd; /* stp_wmt fd */
     fds[0].events = POLLIN | POLLRDNORM; /* wait read events */
     ++fd_num;
- 
-#if 0 //does this part needed?, no uart device is opened at this time.    
+
+#if 0 //does this part needed?, no uart device is opened at this time.
     if (gStpMode == STP_UART_FULL) {
         fds[1].fd = gTtyFd;          /* real tty fd */
         fds[1].events = POLLERR | POLLHUP;  /* POLLERR | POLLHUP is unnecessary? */
         ++fd_num;
     }
 #endif
-    
+
     while (!__io_canceled) {
         fds[0].revents = 0;
-#if 0 //does this part needed?, do we need to poll on uart?        
-        if (gStpMode == STP_UART_FULL) {        
+#if 0 //does this part needed?, do we need to poll on uart?
+        if (gStpMode == STP_UART_FULL) {
             fds[1].revents = 0;
         }
-#endif     
+#endif
         err = poll(fds, fd_num, 2000);  // 5 seconds
         if (err < 0) {
             if (errno == EINTR) {
@@ -1693,14 +1695,14 @@ int main(int argc, char *argv[])
         else if (!err) {
             continue;
         }
-#if 0 //does this part needed?, do we need to poll on uart? 
+#if 0 //does this part needed?, do we need to poll on uart?
         if (gStpMode == STP_UART_FULL) {
             if (fds[1].revents & (POLLERR | POLLHUP)) {
                 ALOGI("poll result: pa[1].revents:0x%x\n", fds[1].revents);
                 break;
             }
         }
-#endif        
+#endif
         if (fds[0].revents & POLLIN) {
             memset(gCmdStr, 0, sizeof(gCmdStr));
             len = read(gWmtFd, gCmdStr, sizeof(gCmdStr)-1);
@@ -1755,4 +1757,3 @@ clean_up:
 
     return 0;
 }
-
