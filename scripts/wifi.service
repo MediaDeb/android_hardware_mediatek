@@ -1,12 +1,15 @@
 [Unit]
 Description=Enable MT6620 wireless via /dev/wmtWifi
+Requires=mt6620_launcher.service
+After=mt6620_launcher.service
+Before=networking.service
 
 [Service]
 Type=oneshot
+ExecStartPre=/bin/sleep 3
 ExecStart=/bin/bash -c "echo 1 > /dev/wmtWifi"
+RemainAfterExit=true
 ExecStop= /bin/bash -c "echo 0 > /dev/wmtWifi"
 
-
 [Install]
-Wanted-By=network.target
-Wants=wifi_loader.service
+WantedBy=networking.service

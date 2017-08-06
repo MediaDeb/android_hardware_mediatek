@@ -1,10 +1,8 @@
 [Unit]
-Description=Start MT6620 combo helper
+Description=Start MT6620 combo loader
 
 [Service]
-Type=simple
-ExecStart=/usr/sbin/mt6620_start_wireless.sh
+Type=oneshot
+ExecStart=/usr/sbin/mt6620_loader.sh
+RemainAfterExit=true
 ExecStop=
-
-[Install]
-Wanted-By=network.target

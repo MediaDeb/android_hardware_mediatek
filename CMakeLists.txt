@@ -21,8 +21,8 @@ install(TARGETS wifi_loader 6620_launcher DESTINATION sbin)
 
 file(GLOB_RECURSE FW_FILES ./firmware-umi-x8/* )
 file(GLOB_RECURSE UNITS ./scripts/*.service)
-
+file(GLOB_RECURSE SCRIPTS ./scripts/*.sh)
 
 install(FILES ${FW_FILES} DESTINATION /lib/firmware)
-install(FILES scripts/mt6620_start_wireless.sh DESTINATION sbin)
+install(FILES ${SCRIPTS} DESTINATION sbin)
 install(FILES ${UNITS} DESTINATION /etc/systemd/system)
