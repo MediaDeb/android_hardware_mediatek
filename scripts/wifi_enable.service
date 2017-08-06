@@ -1,8 +1,12 @@
-Description=Enable MT6620 wireless
+[Unit]
+Description=Enable MT6620 wireless via /dev/wmtWifi
 
 [Service]
-Type=simple
-ExecStart=echo 1 > /dev/wmtWifi
-ExecStop=echo 0 > /dev/wmtWifi
+Type=oneshot
+ExecStart=/bin/bash -c "echo 1 > /dev/wmtWifi"
+ExecStop= /bin/bash -c "echo 0 > /dev/wmtWifi"
+
+
+[Install]
 Wanted-By=network.target
 Wants=wifi_loader.service

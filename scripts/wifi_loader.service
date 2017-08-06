@@ -1,7 +1,10 @@
-Description=Start MT6620 wireless
+[Unit]
+Description=Start MT6620 combo helper
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/mt6620_start_wireless
+ExecStart=/usr/sbin/mt6620_start_wireless.sh
 ExecStop=
+
+[Install]
 Wanted-By=network.target
