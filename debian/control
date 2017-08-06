@@ -10,6 +10,15 @@ Homepage: <insert the upstream URL, if relevant>
 
 Package: mtk-wifi-tools
 Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, mtk-wifi-nvram, mtk-wifi-nvram
+Description: Tools to bring up wireless
+
+Package: mtk-wifi-nvram
+Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: <insert up to 60 chars description>
- <insert long description, indented with spaces>
+Description: NVRAM for UMI-X2
+
+Package: mtk-wifi-firmware
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Firmware for UMI-X2 WiFi
