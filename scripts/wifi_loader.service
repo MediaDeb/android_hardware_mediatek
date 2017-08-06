@@ -4,4 +4,4 @@ Description=Start MT6620 wireless
 Type=simple
 ExecStart=/usr/sbin/mt6620_start_wireless
 ExecStop=
-WantedBy=network.target
+Wanted-By=network.target

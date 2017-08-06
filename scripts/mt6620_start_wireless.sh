@@ -10,7 +10,6 @@ if [ ! /dev/wmtWifi ]; then
     /usr/sbin/wifi_loader
 fi
 
-
 /usr/sbin/6620_launcher -b 4000000 -p /lib/firmware/ -d /dev/ttyMT2
 
 #From now on - just run

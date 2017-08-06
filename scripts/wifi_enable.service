@@ -4,5 +4,5 @@ Description=Enable MT6620 wireless
 Type=simple
 ExecStart=echo 1 > /dev/wmtWifi
 ExecStop=echo 0 > /dev/wmtWifi
-WantedBy=network.target
+Wanted-By=network.target
 Wants=wifi_loader.service
